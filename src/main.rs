@@ -1,6 +1,6 @@
 use std::{io::Cursor, net::UdpSocket};
 
-use lab::{build_query, parse_header, parse_question};
+use lab::{build_query, parse_header, parse_question, parse_record};
 
 fn main() {
     let socket = UdpSocket::bind("0.0.0.0:0").expect("couldn't bind to address");
@@ -18,4 +18,5 @@ fn main() {
     let mut buf_curosr = Cursor::new(buf);
     dbg!(parse_header(&mut buf_curosr));
     dbg!(parse_question(&mut buf_curosr));
+    dbg!(parse_record(&mut buf_curosr));
 }
