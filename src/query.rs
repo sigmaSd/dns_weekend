@@ -28,7 +28,7 @@ impl DNSHeader {
     }
 }
 
-pub struct DNSQuestion<const N: usize> {
+struct DNSQuestion<const N: usize> {
     name: [u8; N],
     type_: u16,
     class: u16,
