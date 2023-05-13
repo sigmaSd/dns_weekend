@@ -1,6 +1,8 @@
 //In network packets, integers are always encoded in a big endian way
 //(though little endian is the default in most other situations).
 
+use std::mem::size_of;
+
 #[derive(Default, Debug)]
 pub struct DNSHeader {
     id: u16,
@@ -11,7 +13,7 @@ pub struct DNSHeader {
     num_additionals: u16,
 }
 impl DNSHeader {
-    fn to_bytes(&self) -> [u8; 12] {
+    fn to_bytes(&self) -> [u8; size_of::<DNSHeader>()] {
         [
             self.id.to_be_bytes(),
             self.flags.to_be_bytes(),
@@ -65,7 +67,10 @@ fn encode_dns_name<const D: usize>(domain_name: [u8; D]) -> [u8; D + 2] {
 const TYPE_A: u16 = 1;
 const CLASS_IN: u16 = 1;
 
-pub fn build_query<const D: usize>(domain_name: [u8; D], record_type: u16) -> [u8; 12 + D + 2 + 4]
+pub fn build_query<const D: usize>(
+    domain_name: [u8; D],
+    record_type: u16,
+) -> [u8; size_of::<DNSHeader>() + D + 2 + 4]
 where
     [(); D + 2]: Sized,
     [(); D + 2 + 4]: Sized,
@@ -87,7 +92,7 @@ where
 
     let header_bytes = header.to_bytes();
     let question_bytes = question.to_bytes();
-    let mut result = [0u8; /*header*/ 12 + /*question*/ D + 2 + 4];
+    let mut result = [0u8; /*header*/ size_of::<DNSHeader>() + /*question*/ D + 2 + 4];
     result[..header_bytes.len()].copy_from_slice(&header_bytes);
     result[header_bytes.len()..].copy_from_slice(&question_bytes);
     result
