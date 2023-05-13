@@ -5,12 +5,12 @@ use std::mem::size_of;
 
 #[derive(Default, Debug)]
 pub struct DNSHeader {
-    id: u16,
-    flags: u16,
-    num_questions: u16,
-    num_answers: u16,
-    num_authorities: u16,
-    num_additionals: u16,
+    pub id: u16,
+    pub flags: u16,
+    pub num_questions: u16,
+    pub num_answers: u16,
+    pub num_authorities: u16,
+    pub num_additionals: u16,
 }
 impl DNSHeader {
     fn to_bytes(&self) -> [u8; size_of::<DNSHeader>()] {
@@ -64,7 +64,7 @@ fn encode_dns_name<const D: usize>(domain_name: [u8; D]) -> [u8; D + 2] {
     encoded
 }
 
-const TYPE_A: u16 = 1;
+pub const TYPE_A: u16 = 1;
 const CLASS_IN: u16 = 1;
 
 pub fn build_query<const D: usize>(

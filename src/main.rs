@@ -1,22 +1,27 @@
-use std::{io::Cursor, net::UdpSocket};
+use std::net::UdpSocket;
 
-use lab::{build_query, parse_header, parse_question, parse_record};
+use lab::{build_query, ip_to_string, DNSPacket, TYPE_A};
 
 fn main() {
     let socket = UdpSocket::bind("0.0.0.0:0").expect("couldn't bind to address");
 
-    const DOMAIN_NAME: &[u8; 15] = b"www.example.com";
-    let query = build_query(*DOMAIN_NAME, 1);
-    socket
-        .send_to(&query, "8.8.8.8:53")
-        .expect("couldn't send message");
+    // can't use a function because of a bug in const gen expr
+    macro_rules! lookup_domain {
+        ($n: tt) => {
+            let query = build_query(*$n, TYPE_A);
+            socket
+                .send_to(&query, "8.8.8.8:53")
+                .expect("couldn't send message");
 
-    let mut buf = [0; 1024];
+            let mut buf = [0; 1024];
+            socket.recv(&mut buf).expect("couldn't receive message");
 
-    socket.recv(&mut buf).expect("couldn't receive message");
+            let packet = DNSPacket::parse(buf);
+            dbg!(&packet);
+            dbg!(ip_to_string(packet.answers[0].data.clone()));
+        };
+    }
 
-    let mut buf_curosr = Cursor::new(buf);
-    dbg!(parse_header(&mut buf_curosr));
-    dbg!(parse_question(&mut buf_curosr));
-    dbg!(parse_record(&mut buf_curosr));
+    lookup_domain!(b"example.com");
+    lookup_domain!(b"recurse.com");
 }

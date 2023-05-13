@@ -5,19 +5,25 @@ use std::io::Cursor;
 
 #[derive(Debug)]
 pub struct DNSRecord {
-    name: String,
-    type_: u16,
-    class: u16,
-    ttl: u32,
-    data: Vec<u8>,
+    pub name: String,
+    pub type_: u16,
+    pub class: u16,
+    pub ttl: u32,
+    pub data: Vec<u8>,
 }
 
 pub fn parse_header(reader: &mut Cursor<[u8; 1024]>) -> DNSHeader {
     let mut header = [0; 12];
-    reader
-        .read_exact(&mut header)
-        .expect("couldn't read header");
-    unsafe { std::mem::transmute::<[u8; 12], DNSHeader>(header) }
+    reader.read_exact(&mut header).unwrap();
+
+    DNSHeader {
+        id: u16::from_be_bytes([header[0], header[1]]),
+        flags: u16::from_be_bytes([header[2], header[3]]),
+        num_questions: u16::from_be_bytes([header[4], header[5]]),
+        num_answers: u16::from_be_bytes([header[6], header[7]]),
+        num_authorities: u16::from_be_bytes([header[8], header[9]]),
+        num_additionals: u16::from_be_bytes([header[10], header[11]]),
+    }
 }
 
 pub fn decode_name(reader: &mut Cursor<[u8; 1024]>) -> String {
@@ -74,7 +80,7 @@ pub fn decode_name_simple(reader: &mut Cursor<[u8; 1024]>) -> String {
 }
 
 pub fn parse_question(reader: &mut Cursor<[u8; 1024]>) -> DNSQuestion {
-    let name = decode_name_simple(reader);
+    let name = decode_name(reader);
     let mut data = [0; 4];
     reader.read_exact(&mut data).expect("couldn't read data");
     let type_ = u16::from_be_bytes(data[0..2].try_into().unwrap());
@@ -110,4 +116,47 @@ pub struct DNSQuestion {
     name: String,
     type_: u16,
     class: u16,
+}
+
+#[derive(Debug)]
+pub struct DNSPacket {
+    pub header: DNSHeader,
+    pub questions: Vec<DNSQuestion>,
+    pub answers: Vec<DNSRecord>,
+    pub authorities: Vec<DNSRecord>,
+    pub additionals: Vec<DNSRecord>,
+}
+
+impl DNSPacket {
+    pub fn parse(data: [u8; 1024]) -> Self {
+        let mut reader = Cursor::new(data);
+        let header = parse_header(&mut reader);
+        let questions = (0..header.num_questions)
+            .map(|_| parse_question(&mut reader))
+            .collect();
+        let answers = (0..header.num_answers)
+            .map(|_| parse_record(&mut reader))
+            .collect();
+        let authorities = (0..header.num_authorities)
+            .map(|_| parse_record(&mut reader))
+            .collect();
+        let additionals = (0..header.num_additionals)
+            .map(|_| parse_record(&mut reader))
+            .collect();
+
+        DNSPacket {
+            header,
+            questions,
+            answers,
+            authorities,
+            additionals,
+        }
+    }
+}
+
+pub fn ip_to_string(ip: Vec<u8>) -> String {
+    ip.into_iter()
+        .map(|p| p.to_string())
+        .collect::<Vec<_>>()
+        .join(".")
 }
