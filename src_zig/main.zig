@@ -22,20 +22,21 @@ const DNSHeader = struct {
 const ArrayList = std.ArrayList;
 
 const DNSQuestion = struct {
-    name: ArrayList(u8),
+    name: []u8,
     type: u16,
     class: u16,
-    allocator: std.mem.Allocator,
 
     const Self = @This();
 
-    fn to_bytes(self: Self) error{OutOfMemory}!ArrayList(u8) {
-        var array = ArrayList(u8).init(self.allocator);
-        try array.appendSlice(self.name.items);
+    fn to_bytes(self: Self, allocator: std.mem.Allocator) error{OutOfMemory}![]u8 {
+        var array = ArrayList(u8).init(allocator);
+        errdefer array.deinit();
+
+        try array.appendSlice(self.name);
         try array.appendSlice(&std.mem.toBytes(self.type));
         try array.appendSlice(&std.mem.toBytes(self.class));
 
-        return array;
+        return array.toOwnedSlice();
     }
 };
 
@@ -52,14 +53,14 @@ pub fn main() !void {
     std.debug.print("{any}", .{header.to_bytes()});
 
     var domain_array = ArrayList(u8).init(allocator);
+    errdefer domain_array.deinit();
     try domain_array.appendSlice("www.google.com");
 
     const question = DNSQuestion{
-        .allocator = allocator,
-        .name = domain_array,
+        .name = domain_array.items,
         .type = 1,
         .class = 5,
     };
 
-    std.debug.print("{any}", .{try question.to_bytes()});
+    std.debug.print("{any}", .{try question.to_bytes(allocator)});
 }
