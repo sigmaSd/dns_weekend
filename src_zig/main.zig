@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 
 const DNSHeader = struct {
     id: u16,
@@ -28,7 +29,7 @@ const DNSQuestion = struct {
 
     const Self = @This();
 
-    fn to_bytes(self: Self, allocator: std.mem.Allocator) error{OutOfMemory}![]u8 {
+    fn to_bytes(self: Self, allocator: Allocator) error{OutOfMemory}![]u8 {
         var array = ArrayList(u8).init(allocator);
         errdefer array.deinit();
 
@@ -39,6 +40,52 @@ const DNSQuestion = struct {
         return array.toOwnedSlice();
     }
 };
+
+fn create_struct(n: comptime_int) type {
+    return struct { a: [n]u8 };
+}
+
+fn encode_dns_name(domain_name: []const u8, allocator: Allocator) error{OutOfMemory}![]const u8 {
+    var array = ArrayList(u8).init(allocator);
+    errdefer array.deinit();
+    var iter = std.mem.split(u8, domain_name, &[_]u8{'.'});
+    while (iter.next()) |part| {
+        try array.append(std.mem.toBytes(part.len)[0]);
+        try array.appendSlice(part);
+    }
+    try array.append(0x0);
+
+    return array.toOwnedSlice();
+}
+
+const test_allocator = std.testing.allocator;
+test "encode_dns_name_test" {
+    const expectEqualSlices = std.testing.expectEqualSlices;
+    const encoded = try encode_dns_name("google.com", test_allocator);
+    defer test_allocator.free(encoded);
+    try expectEqualSlices(u8, "\x06google\x03com\x00", encoded);
+    try expectEqualSlices(u8, "\x06google\x03com\x00", &encode_dns_name_comptime(10, "google.com".*));
+}
+
+fn encode_dns_name_comptime(comptime len: usize, comptime domain_name: [len]u8) [domain_name.len + 2]u8 {
+    var encoded: [domain_name.len + 2]u8 = undefined;
+    var offset: usize = 0;
+    var iter = std.mem.split(u8, &domain_name, &[_]u8{'.'});
+
+    while (iter.next()) |part| {
+        encoded[offset] = std.mem.toBytes(part.len)[0];
+        offset += 1;
+
+        for (part) |element, i| {
+            encoded[offset + i] = element;
+        }
+
+        offset += part.len;
+    }
+    encoded[offset] = 0x0;
+
+    return encoded;
+}
 
 pub fn main() !void {
     var buffer: [200]u8 = undefined;
